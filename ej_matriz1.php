@@ -61,6 +61,7 @@ $t1=hrtime(true);
 echo Matrix::det($M);
 echo "\n". (hrtime(true)-$t1)/1e+6 . " ms\n";
 
+//Test comment 1
 
 
 ?>
