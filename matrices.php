@@ -148,7 +148,7 @@ public function get_dims() { return [$this->width, $this->height]; }
 *
 * @return boolean True if the matrix is square, False otherwise
 */
-public function is_square() { return $this->width == $this->height; }
+public function is_squared() { return $this->width == $this->height; }
 
 
 
@@ -484,6 +484,26 @@ return new Matrix($B);
 
 
 /**
+* It gets the trace of the matrix calling it
+*
+* @return float The trace of $this matrix
+*/
+public function trace() {
+
+if(!$this->is_squared()) throw new DimensionException("The matrix must be squared!");
+
+$sum=0;
+for($j=0; $j< $this->width; $j++) {
+  $sum += $this->data[$j][$j];
+}
+
+return $sum;
+}
+
+
+
+
+/**
 * Sum of two  vectors (or matrices)
 *
 * @param array|Matrix $a First vector or matrix to add
@@ -636,7 +656,7 @@ public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
 *
 * @param float $lim Limit error for numerical stability, if |$x|<$lim it counts like zero. Util for pivoting
 *
-* @param boolean $use_cols If it's true, it avoids from doing row operations in all columns if almost all the row is zero to save computation time (e.g., the identity). Set it to false if you are not secure of how many zeros have the rows
+* @param boolean $use_cols If it's true, it avoids doing the row operations in all columns using a list of the columns which entries in the actual row are not zero. Util if almost all the row is zero to save computation time (e.g., the identity), but it's insecure and the results could be innaccurate. Set it to false if you are not secure of how many zeros have the rows
 */
 
 public function gauss_jordan(Matrix $Ap,$lim=0.001,$use_cols=false) {
@@ -659,7 +679,7 @@ for($j=0; $j<$n; $j++) {
       
       if($i != $j) { $A->permute_rows($j,$i, $j);    $this->permute_rows($j,$i); } //Pivot
       
-      if($use_cols) { //Save permutation
+      if($use_cols) { //Save columns used in the permutation
                         $tmp = ( isset($cols[$j])? $cols[$j]:$j );
                         $cols[$j] = ( isset($cols[$i])? $cols[$i]:$i );
                         $cols[$i] = $tmp; }
@@ -673,13 +693,13 @@ for($j=0; $j<$n; $j++) {
             break; }
   
   
-  $this->scale_row($j, 1/$A->get_array()[$j][$j], 0,$use_cols,$cols,$j);
+  $this->scale_row($j, 1/$A->get_array()[$j][$j], 0, $cols,$j);
   $A->scale_row($j, 1/$A->get_array()[$j][$j], $j); //Normalize pivot
   
   
   for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
     if($A->get_array()[$i][$j] !=0) {
-          $this->sum_rows($i,$j, -$A->get_array()[$i][$j], 0,$use_cols,$cols,$j);
+          $this->sum_rows($i,$j, -$A->get_array()[$i][$j], 0, $cols,$j);
           $A->sum_rows($i,$j, -$A->get_array()[$i][$j], $j);
     }
   } //End second for($i)
@@ -695,7 +715,6 @@ for($j=0; $j<$n; $j++) {
     } //End for($i)
      
   } //End second for($j)
-
 
 
 unset($A); #Delete $A duplicate matrix
@@ -724,7 +743,6 @@ $n=$A->get_h(); #Matrix nxn
  
 if($A->get_w() != $n) throw new DimensionException("Not square matrix given!");
 
-$cols=array();
 
 //Run over $j columns, to obtain an upper-triangular matrix
 for($j=0; $j<$n; $j++) {
@@ -770,50 +788,71 @@ return $det;
 
 
 #Permutes $i1 and $i2 rows
-public function permute_rows($i1,$i2, $j0=0,$perm=false, $cols=array(), $l=0) { 
-if($perm) { //Just operate with some columns (util for almost-zero rows)
+/**
+ * Permutes (swaps) two rows in the matrix.
+ * 
+ * @param int $i1 The first row to swap (counted from 0 to $height-1)
+ * @param int $i2 The second row to swap (counted from 0 to $height-1)
+ * @param int $j0 Index of the first column to take into account while swapping the rows (i.e., just the columns $j>=$j0 will be swapped). Util if the columns before $j0 are already equal.
+ * @param array $cols A list or array with the columns to be taken into account while swapping, i.e., just the columns in this list will be swapped. Util if you know in which columns the rows are equal.
+ * @param int $l Length of the $cols list to be taken into account while swapping, i.e., just the first $l elements of $cols will be swapped.
+ * @return Matrix The permuted matrix that called this method.
+ */
+public function permute_rows($i1,$i2, $j0=0, $cols=array(), $l=0) { 
+if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
   for($j=0; $j<=$l; $j++) { $temp = $this->data[$i1][$cols[$j]]; $this->data[$i1][$cols[$j]] = $this->data[$i2][$cols[$j]]; $this-> data[$i2][$cols[$j]] = $temp; }
   
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) { $temp = $this->data[$i1][$j]; $this->data[$i1][$j] = $this->data[$i2][$j]; $this->data[$i2][$j] = $temp; }
-  
 }
 
 }
-
-
-
-
 
 
 
 
 #Multiplies a row by a scalar
-public function scale_row($i,$c, $j0=0,$perm=false,$cols=array(),$l=0) { 
-if($perm) { //Just operate with some columns (util for almost-zero rows)
+/**
+ * Scales a row in the matrix.
+ * 
+ * @param int $i The row to be scaled (counted from 0 to $height-1)
+ * @param int $c The scalar
+ * @param int $j0 Index of the first column to take into account while scaling the row (i.e., just the columns $j>=$j0 will be scaled). Util if the columns before $j0 are zero.
+ * @param array $cols A list or array with the columns to be taken into account while scaling, i.e., just the columns in this list will be scaled. Util if you know in which columns the row is not zero.
+ * @param int $l Length of the $cols list to be taken into account while scaling, i.e., just the first $l elements of $cols will be scaled.
+ * @return Matrix The matrix that called this method with its $i-th row scaled.
+ */
+public function scale_row($i,$c, $j0=0, $cols=array(),$l=0) { 
+if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
   for($j=0; $j<=$l; $j++) $this->data[$i][$cols[$j]] *= $c;
 
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) $this->data[$i][$j] *= $c;
-
 }
 
 }
-
-
 
 
 
 
 
 #Adds $c times $i2 row to the $i1 row
-public function sum_rows($i1,$i2,$c, $j0=0,$perm=false,$cols=array(),$l=0) { 
-if($perm) { //Just operate with some columns (util for almost-zero rows)
+/**
+ * Adds a scaled row in the matrix onto another row.
+ * 
+ * @param int $i1 The row to be updated after adding the $i2 row (counted from 0 to $height-1)
+ * @param int $i2 The row to be added onto $i1 (counted from 0 to $height-1)
+ * @param int $j0 Index of the first column to take into account while adding the rows (i.e., just the columns $j>=$j0 will be added). Util if the columns before $j0 in the row $i2 are zero.
+ * @param array $cols A list or array with the columns to be taken into account while adding, i.e., just the columns in this list will be added. Util if you know in which columns the row $i2 is not zero.
+ * @param int $l Length of the $cols list to be taken into account while adding the rows, i.e., just the first $l elements of $cols will be added.
+ * @return Matrix The matrix that called this method after adding the scaled $i2 row onto the $i1 one.
+ */
+public function sum_rows($i1,$i2,$c, $j0=0, $cols=array(),$l=0) { 
+if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
   for($j=0; $j<=$l; $j++) $this->data[$i1][$cols[$j]] += $c*$this->data[$i2][$cols[$j]];
 
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) $this->data[$i1][$j] += $c*$this->data[$i2][$j] ;
-
 }
 
 }
