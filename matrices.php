@@ -47,8 +47,8 @@ public function __construct($msg="Error while constructing the matrix. Ensure th
 
 class Matrix {
 
-private $content=array(); //Matrix's content (as array)
-public $width=0, $height;
+private $data=array(); //Matrix's data (as array)
+private $width=0, $height;
 
 
 
@@ -58,50 +58,97 @@ public $width=0, $height;
 *
 * @param array $arr A 2-dimensional array, with all its array arguments of same size. This array contains the matrix's entries
 */
-public function __construct($arr) {
-$fl=false;
-
-if(is_array($arr)) {
-  $this->height = sizeof($arr); //Matrix's height
+public function __construct(array $arr) {
+  $fl=true;
   
-  if($this->height > 0) {
-    
-    if(is_array($arr[0])) $this->width = sizeof($arr[0]);  //Matrix's width
-    
-  } else echo "The height is zero\n"; //Matrix with 0 height
-
+  $this->height = count($arr); //Matrix's height
   
- if($this->width > 0) {
+  //Check if the array is not empty
+  if($this->height == 0) {
+      throw new BadFormationException("The matrix's height couldn't be zero");
+  }
+  
+  //Check if the first row is an array
+  if(!is_array($arr[0])) {
+    throw new BadFormationException("Matrix's rows must be arrays");
+  }
+  
+  $this->width = count($arr[0]);  //Matrix's width
+  
+  
+  //Check if the first row is not empty
+  if($this->width == 0) {
+    throw new BadFormationException("Matrix's width couldn't be zero");
+  }
+  
+  
   for($i=0; $i< $this->height; $i++) {
-    if(is_array($arr[$i])) {
-      
-      if(sizeof($arr[$i]) == $this->width) $fl=true;
-      else { $fl=false; echo "Rows are not of same size\n"; break; }
-    
-    } else { $fl=false; echo "You're not giving a matrix (matrix's rows aren't arrays)\n"; break; } //No is_array() in rows
-
+    //Check if the rows are arrays
+    if(!is_array($arr[$i])) {
+      $fl=false;
+      break;
+    }
+  
+    //Check if the rows are the same size
+    if(count($arr[$i]) != $this->width) {
+      $fl=false;
+      break;
+    } 
   } //End loop
-
- } else echo "Matrix's width is zero\n"; //Matrix with zero width
-
-} else echo "You're not giving a matrix (argument is not an array)\n"; //No is_array() the matrix itself
-
-
-//Finally, save the matrix's array in $content variable
-if($fl) $this->content = $arr;
-else echo "Fatal error: it was not possible to create the matrix\n";
-
+  
+  //If some row had an error, throw an exception
+  if(!$fl) throw new BadFormationException();
+  
+  //Finally, save the matrix's array in $data variable
+  $this->data = $arr;
+  
 }
 
 
 
 /**
-* Return the matrix as an array object
+* Returns the matrix as an array object
 *
 * @return array The 2-dimensional array with the entries of the matrix
 */
-public function get_array() { return $this->content; }
+public function get_array() { return $this->data; }
 
+
+
+/**
+* Returns the matrix's width
+*
+* @return int The width of the matrix
+*/
+public function get_w() { return $this->width; }
+
+
+
+/**
+* Returns the matrix's height
+*
+* @return int The height of the matrix
+*/
+public function get_h() { return $this->height; }
+
+
+
+
+/**
+* Returns the matrix's dimensions as an array [$width,$height]
+*
+* @return array The dimensions [$width,$height] of the matrix
+*/
+public function get_dims() { return [$this->width, $this->height]; }
+
+
+
+/**
+* Says if the matrix is square
+*
+* @return boolean True if the matrix is square, False otherwise
+*/
+public function is_square() { return $this->width == $this->height; }
 
 
 
@@ -112,7 +159,7 @@ public function get_array() { return $this->content; }
 */
 public function show($digits=-1) {
 
-foreach($this->content as $M_i) {
+foreach($this->data as $M_i) {
   foreach($M_i as $x) echo  $digits==-1? "$x ": round($x, $digits)." ";
   echo "\n";
 }
@@ -133,13 +180,11 @@ foreach($this->content as $M_i) {
 * @param array $v The array to be converted in column matrix
 * @return Matrix The column matrix asociated to $v
 */
-public static function to_col($v) {
-if(is_array($v)) {
+public static function to_col(array $v) {
   $out=array();
-  for($i=0; $i< sizeof($v);$i++) $out[][0] = $v[$i];
-
+  for($i=0; $i< count($v);$i++) $out[][0] = $v[$i];
+  
   return new Matrix($out);
-} else echo "Argument is not an array";
 }
 
 
@@ -153,10 +198,8 @@ if(is_array($v)) {
 * @param array $v The array to be converted in row matrix
 * @return Matrix The row matrix asociated to $v
 */
-public static function to_row($v) {
-if(is_array($v)) {
+public static function to_row(array $v) {
   return new Matrix( array($v) );
-} else echo "Argument is not an array";
 }
 
 
@@ -172,10 +215,10 @@ if(is_array($v)) {
 */
 public function get_col($j) {
 $out=array();
-$m= $this->content;
+#$m= $this->data; // More speed if we don't access to the object's attributes repeatedly
 
-for($i=0; $i< $this->height; $i++) $out[]= $m[$i][$j];
-unset($m);
+for($i=0; $i< $this->height; $i++) $out[]= $this->data[$i][$j];
+#unset($m);
 
 return $out;
 }
@@ -192,7 +235,7 @@ return $out;
 * @return array The i-th row of the matrix, as an array
 */
 public function get_row($i) {
-  return $this->content[$i];
+  return $this->data[$i];
 }
 
 
@@ -233,7 +276,7 @@ return new Matrix($I);
 public static function random_matrix($n,$m,$Linf=-100,$Lsup=100) {
 $M=array();
 for($i=0; $i<$n; $i++) {
-  //Fills the ($i,$j) input with a random number between $Linf and $Lsup
+  //Fills the [$i,$j] input with a random number between $Linf and $Lsup
   for($j=0; $j<$m; $j++) $M[$i][$j] = $Linf + ($Lsup-$Linf)*(rand()/getrandmax());
 }
 return new Matrix($M);
@@ -254,15 +297,16 @@ return new Matrix($M);
 */
 public static function equals(Matrix $A,Matrix $B,$lim=0) {
 
-if($lim==0) return $A->content == $B->content;
+if($lim==0) return $A->get_array() == $B->get_array();
 else {
- $out = $A->width == $B->width && $A->height == $B->height;
- if($out) {
-  for($i=0; $i< $A->height; $i++) {
-    for($j=0; $j< $A->width; $j++) $out =$out&& ($A->content[$i][$j] - $B->content[$i][$j]) <$lim && ($A->content[$i][$j] - $B->content[$i][$j]) >-$lim;
+  $out = $A->get_dims() == $B->get_dims();
+  if($out) {
+    for($i=0; $i< $A->get_h(); $i++) {
+      for($j=0; $j< $A->get_w(); $j++) $out =$out&& ( ($A->get_array()[$i][$j] - $B->get_array()[$i][$j]) <$lim ) && ( ($A->get_array()[$i][$j] - $B->get_array()[$i][$j]) >-$lim );
+    }
   }
- }
- return $out; }
+  return $out;
+}
 
 }
 
@@ -329,19 +373,15 @@ public static function rot_matrix_Z($th) {
 * @param array $v The second vector to multiply
 * @return array The dot product $u*$v
 */
-public static function dot_prod($u,$v) {
+public static function dot_prod(array $u,array $v) {
+$n=count($u);
 
-if(is_array($u) && is_array($v)) {
-$sum =0;
-$n =sizeof($u);
- if(sizeof($v)==$n) {
-  
-  for($i=0; $i<$n; $i++) $sum += $u[$i]*$v[$i];
-  
-  return $sum;  
- } else echo "Vectors are not of same size";
-} else echo "Arguments are not array";
+if(count($v)!=$n) throw new DimensionException();
 
+$sum=0;
+for($i=0; $i<$n; $i++) $sum += $u[$i]*$v[$i];
+
+return $sum;
 }
 
 
@@ -370,9 +410,10 @@ public static function norm($u) {
 public static function gram_schmidt(Matrix $A) {
 $u=array();
 
-for($i=0; $i< $A->height; $i++) {
-  $vi= $A->content[$i];
-  $ui= $A->content[$i]; #Used for the sum
+for($i=0; $i< $A->get_h(); $i++) {
+  $vi= $A->get_row($i); #Original rows
+  $ui= $A->get_row($i); #Rows to be transformed
+
   for($k=0; $k<$i; $k++) $ui= Matrix::sum($ui, Matrix::scale(-Matrix::dot_prod($vi,$u[$k]), $u[$k]) );
   
   $ui= Matrix::scale(1.0/Matrix::norm($ui), $ui);
@@ -429,12 +470,12 @@ public static function euler_angles(Matrix $Rm) {
 * @return Matrix The transposed matrix of $this
 */
 public function trans() {
-#$A_t= $this->content;
+#$A_t= $this->data;
 $B= array(); //New matrix
 
 for($j=0; $j< $this->width; $j++) {
   $Aj=array();
-  for($i=0; $i< $this->height; $i++) $B[$j][$i] = $this->content[$i][$j];
+  for($i=0; $i< $this->height; $i++) $B[$j][$i] = $this->data[$i][$j];
   }
 
 return new Matrix($B);
@@ -450,35 +491,35 @@ return new Matrix($B);
 * @return array|Matrix The sum $a+$b
 *
 */
-public static function sum($a,$b) {
+public static function sum(Matrix|array $a,Matrix|array $b) {
 
+//Sum of two vectors (arrays)
 if(is_array($a) && is_array($b)) {
-$c=array();
-$n =sizeof($a);
-
- if(sizeof($b)==$n) {
+  $c=array();
+  $n =count($a);
+  
+  if(count($b)!=$n) throw new DimensionException(); #We can't sum vectors of different length
   
   for($i=0; $i<$n; $i++) $c[] = $a[$i]+$b[$i];
   return $c;
+}
+
+
+elseif(get_class($a)=="Matrix" && get_class($b)=="Matrix") {
+  $c=array();
   
- } else echo "Vectors are not of same size";
-
-
-} elseif(get_class($a)=="Matrix" && get_class($b)=="Matrix") {
- $c=array();
- $n=$a->height;
- $m=$a->width;
- 
- if($b->height==$n && $b->width==$m) {
-   for($i=0; $i<$n; $i++) {
-     $ci=array();
-     for($j=0; $j<$m; $j++) $ci[]= $a->content[$i][$j] + $b->content[$i][$j];
-     $c[]=$ci;
-   }
- return new Matrix($c);
- 
- } else echo "Matrices are not the same dimensions";
-} else echo "Arguments are not array nor matrix";
+  if($a->get_dims() != $b->get_dims()) throw new DimensionException(); #We can't sum matrices of different dims
+  
+  $n=$a->get_h();
+  $m=$a->get_w();
+  for($i=0; $i<$n; $i++) {
+    $ci=array();
+    for($j=0; $j<$m; $j++) $ci[]= $a->get_array()[$i][$j] + $b->get_array()[$i][$j];
+    $c[]=$ci;
+  }
+  return new Matrix($c);
+  
+} else throw new MatrixException("You can't sum a matrix and a vector.");
 
 }
 
@@ -494,26 +535,25 @@ $n =sizeof($a);
 * @return array|Matrix The product $s*$A
 *
 */
-public static function scale($s,$A) {
+public static function scale($s, Matrix|array $A) {
 
 if(is_array($A)) {
-$c=array();
+  $c=array();
   
   for($i=0; $i<sizeof($A); $i++) $c[] = $s*$A[$i];
   return $c;
-
-
+  
 } elseif(get_class($A)=="Matrix") {
- $c=array();
- 
-   for($i=0; $i< $A->height; $i++) {
-     $ci=array();
-     for($j=0; $j< $A->width; $j++) $ci[]= $s*$A->content[$i][$j];
-     $c[]=$ci;
-   }
+  $c=array();
+  
+  for($i=0; $i< $A->get_h(); $i++) {
+    $ci=array();
+    for($j=0; $j< $A->get_w(); $j++) $ci[]= $s*$A->get_array()[$i][$j];
+    $c[]=$ci;
+  }
  return new Matrix($c);
  
-} else echo "Arguments are not array nor matrix";
+}
 
 }
 
@@ -529,16 +569,17 @@ $c=array();
 * @return Matrix The product AB
 */
 public static function prod(Matrix $A,Matrix $B) {
-if($A->width == $B->height) {
+
+if($A->get_w() != $B->get_h()) throw new DimensionException("Incompatible sizes");
+
 $C=array();
-for($i=0;$i< $A->height; $i++) {
-  for($j=0; $j< $B->width; $j++) {
+for($i=0;$i< $A->get_h(); $i++) {
+  for($j=0; $j< $B->get_w(); $j++) {
     $C[$i][$j] = 0;
-    for($k=0 ; $k< $A->width; $k++) $C[$i][$j] += $A->content[$i][$k]*$B->content[$k][$j];
+    for($k=0 ; $k< $A->get_w(); $k++) $C[$i][$j] += $A->get_array()[$i][$k]*$B->get_array()[$k][$j];
   }
 }
 return new Matrix($C);
-} else echo "Error: incorrect size of the matrices";
 
 }
 
@@ -556,10 +597,10 @@ return new Matrix($C);
 * @return Matrix The inverse of $M
 */
 public static function inv_GJ(Matrix $M, $lim=0.001) {
-$I=Matrix::get_identity($M->width);
-//$M must be squared!!
-$I->gauss_jordan($M,$lim,true); //$use_cols=true saves computational time
-return $I;
+  $I=Matrix::get_identity($M->get_w());
+  //$M must be squared!!
+  $I->gauss_jordan($M,$lim,true); //$use_cols=true saves computational time
+  return $I;
 }
 
 
@@ -577,9 +618,9 @@ return $I;
 * @return Matrix The solution "x" as a column matrix
 */
 public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
-$b=Matrix::to_col($b_arr); //Column $b of system $A*$x = $b
-$b->gauss_jordan($M,$lim);
-return $b;
+  $b=Matrix::to_col($b_arr); //Column $b of system $A*$x = $b
+  $b->gauss_jordan($M,$lim);
+  return $b;
 }
 
 
@@ -600,61 +641,61 @@ return $b;
 
 public function gauss_jordan(Matrix $Ap,$lim=0.001,$use_cols=false) {
 
-$A=new Matrix($Ap->content); #Duplicate to avoid transforming $A with the row operations
+$A=new Matrix($Ap->get_array()); #Duplicate to avoid transforming $A with the row operations
 
-$n=$A->height; #Matrix nxn
+$n=$A->get_h(); #Matrix nxn
  
-if($A->width == $n) {
-  $cols=array();
+if($A->get_w() != $n) throw new DimensionException("Not squared matrix in argument.");
+
+$cols=array();
+
+//Run over the $j columns, to obtain an upper-triangular matrix
+for($j=0; $j<$n; $j++) {
+  $fl=false; //Flag to check if matrix is regular (not singular)
   
-  //Run over $j columns, to obtain an upper-triangular matrix
-  for($j=0; $j<$n; $j++) {
-    $fl=false; //Flag to check if matrix is regular (not singular)
+  for($i=$j; $i<$n; $i++) { //Looking for a pivot
     
-    for($i=$j; $i<$n; $i++) { //Looking for a pivot
+    if($A->get_array()[$i][$j] > $lim || $A->get_array()[$i][$j] < -$lim) { //If |$x|>$lim it's not zero
       
-      if($A->content[$i][$j] >$lim || $A->content[$i][$j] < -$lim) //If |$x|>$lim it's not zero
-         {
-           if($i != $j) { $A->perm($j,$i, $j);    $this->perm($j,$i); } //Pivot
-           
-           if($use_cols) { //Save permutation
-                             $tmp = ( isset($cols[$j])? $cols[$j]:$j );
-                             $cols[$j] = ( isset($cols[$i])? $cols[$i]:$i );
-                             $cols[$i] = $tmp; }
-           
-           $fl=true; break;
-          } //End if(|$x|>$lim)
-    
-    } //End for($i)
-    
-   if(!$fl) { echo "Singular matrix. Try to put a bigger limit (currently \$lim=$lim). If error persists, the matrix is not invertible\n";
-              break; }
-    
-    
-    $this->row_times_scalar($j,1/$A->content[$j][$j], 0,$use_cols,$cols,$j);
-    $A->row_times_scalar($j,1/$A->content[$j][$j], $j); //Normalize pivot
-    
-    
-    for($i=$j+1; $i<$n; $i++) { // Elimination, for $i rows after than $j
-      if($A->content[$i][$j] !=0) {
-             $this->sum_rows($i,$j,-$A->content[$i][$j], 0,$use_cols,$cols,$j);
-             $A->sum_rows($i,$j,-$A->content[$i][$j], $j);
-      }
-    } //End for($i)
+      if($i != $j) { $A->permute_rows($j,$i, $j);    $this->permute_rows($j,$i); } //Pivot
+      
+      if($use_cols) { //Save permutation
+                        $tmp = ( isset($cols[$j])? $cols[$j]:$j );
+                        $cols[$j] = ( isset($cols[$i])? $cols[$i]:$i );
+                        $cols[$i] = $tmp; }
+      
+      $fl=true; break;
+    } //End if(|$x|>$lim)
+  
+  } //End first for($i)
+  
+  if(!$fl) { throw new MatrixException("Singular matrix. Try to put a bigger limit (currently \$lim=$lim). If error persists, the matrix is not invertible.");
+            break; }
   
   
-  } //End first for($j)
+  $this->scale_row($j, 1/$A->get_array()[$j][$j], 0,$use_cols,$cols,$j);
+  $A->scale_row($j, 1/$A->get_array()[$j][$j], $j); //Normalize pivot
+  
+  
+  for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
+    if($A->get_array()[$i][$j] !=0) {
+          $this->sum_rows($i,$j, -$A->get_array()[$i][$j], 0,$use_cols,$cols,$j);
+          $A->sum_rows($i,$j, -$A->get_array()[$i][$j], $j);
+    }
+  } //End second for($i)
+  
+  
+} //End first for($j)
   
   
   #Elimination of upper terms
   for($j=$n-1; $j>=0; $j--) {
     for($i=$j-1; $i>=0; $i--) {
-      if($A->content[$i][$j]!=0)  $this->sum_rows($i,$j,-$A->content[$i][$j]);
+      if($A->get_array()[$i][$j]!=0)  $this->sum_rows($i,$j, -$A->get_array()[$i][$j]);
     } //End for($i)
      
   } //End second for($j)
- 
-} else echo "Not squared matrix in argument\n";
+
 
 
 unset($A); #Delete $A duplicate matrix
@@ -676,46 +717,42 @@ unset($A); #Delete $A duplicate matrix
 */
 public static function det(Matrix $Ap,$lim=0.001) { //
 
-$A=new Matrix($Ap->content);
+$A=new Matrix($Ap->get_array());
 $det = 1;
 
-$n=$A->height; #Matrix nxn
+$n=$A->get_h(); #Matrix nxn
  
-if($A->width == $n) {
-  $cols=array();
+if($A->get_w() != $n) throw new DimensionException("Not square matrix given!");
+
+$cols=array();
+
+//Run over $j columns, to obtain an upper-triangular matrix
+for($j=0; $j<$n; $j++) {
+  $fl=false; //Flag to check if matrix is regular (not singular)
   
-  //Run over $j columns, to obtain an upper-triangular matrix
-  for($j=0; $j<$n; $j++) {
-    $fl=false; //Flag to check if matrix is regular (not singular)
-    
-    for($i=$j; $i<$n; $i++) { //Looking for a pivot
-      if($A->content[$i][$j] >$lim || $A->content[$i][$j] < -$lim) //If |$x|>$lim it's not zero
-         {
-           if($i != $j) { $A->perm($j,$i, $j);   $det*=-1; } //Pivot
-           
-           $fl=true; break;
-          } //End if(|$x|>$lim)
-    
-    } //End for($i)
-    
-   if(!$fl) { $det=0;   break; }  #Singular matrix
-    
-    
-    $det *= $A->content[$j][$j];
-    $A->row_times_scalar($j,1/$A->content[$j][$j], $j); //Normalize pivot
-    
-    
-    for($i=$j+1; $i<$n; $i++) { // Elimination, for $i rows after than $j
-      if($A->content[$i][$j] !=0) {
-             $A->sum_rows($i,$j,-$A->content[$i][$j], $j);
-      }
-    } //End for($i)
+  for($i=$j; $i<$n; $i++) { //Looking for a pivot
+    if($A->get_array()[$i][$j] >$lim || $A->get_array()[$i][$j] < -$lim) //If |$x|>$lim it's not zero
+       {
+         if($i != $j) { $A->permute_rows($j,$i, $j);   $det*=-1; } //Pivot
+         
+         $fl=true; break;
+        } //End if(|$x|>$lim)
+  } //End for($i)
+  
+  if(!$fl) { $det=0;   break; }  #Singular matrix
   
   
-  } //End for($j)
+  $det *= $A->get_array()[$j][$j];
+  $A->scale_row($j, 1/$A->get_array()[$j][$j], $j); //Normalize pivot
   
   
-} else echo "Not squared matrix in argument\n";
+  for($i=$j+1; $i<$n; $i++) { // Elimination, for $i rows after than $j
+    if($A->get_array()[$i][$j] !=0) {
+           $A->sum_rows($i,$j, -$A->get_array()[$i][$j], $j);
+    }
+  } //End for($i)
+
+} //End for($j)
 
 
 unset($A); #Delete $A duplicate matrix
@@ -733,12 +770,13 @@ return $det;
 
 
 #Permutes $i1 and $i2 rows
-public function perm($i1,$i2, $j0=0,$perm=false, $cols=array(), $l=0) { 
+public function permute_rows($i1,$i2, $j0=0,$perm=false, $cols=array(), $l=0) { 
 if($perm) { //Just operate with some columns (util for almost-zero rows)
-  for($j=0; $j<=$l; $j++) { $temp = $this->content[$i1][$cols[$j]]; $this->content[$i1][$cols[$j]] = $this->content[$i2][$cols[$j]]; $this-> content[$i2][$cols[$j]] = $temp; }
-
+  for($j=0; $j<=$l; $j++) { $temp = $this->data[$i1][$cols[$j]]; $this->data[$i1][$cols[$j]] = $this->data[$i2][$cols[$j]]; $this-> data[$i2][$cols[$j]] = $temp; }
+  
 } else { //Operate starting in $j0 column
-  for($j=$j0; $j< $this->width; $j++) { $temp = $this->content[$i1][$j]; $this->content[$i1][$j] = $this->content[$i2][$j]; $this->content[$i2][$j] = $temp; }
+  for($j=$j0; $j< $this->width; $j++) { $temp = $this->data[$i1][$j]; $this->data[$i1][$j] = $this->data[$i2][$j]; $this->data[$i2][$j] = $temp; }
+  
 }
 
 }
@@ -751,12 +789,12 @@ if($perm) { //Just operate with some columns (util for almost-zero rows)
 
 
 #Multiplies a row by a scalar
-public function row_times_scalar($i,$c, $j0=0,$perm=false,$cols=array(),$l=0) { 
+public function scale_row($i,$c, $j0=0,$perm=false,$cols=array(),$l=0) { 
 if($perm) { //Just operate with some columns (util for almost-zero rows)
-  for($j=0; $j<=$l; $j++) $this->content[$i][$cols[$j]] *= $c;
+  for($j=0; $j<=$l; $j++) $this->data[$i][$cols[$j]] *= $c;
 
 } else { //Operate starting in $j0 column
-  for($j=$j0; $j< $this->width; $j++) $this->content[$i][$j] *= $c;
+  for($j=$j0; $j< $this->width; $j++) $this->data[$i][$j] *= $c;
 
 }
 
@@ -771,10 +809,10 @@ if($perm) { //Just operate with some columns (util for almost-zero rows)
 #Adds $c times $i2 row to the $i1 row
 public function sum_rows($i1,$i2,$c, $j0=0,$perm=false,$cols=array(),$l=0) { 
 if($perm) { //Just operate with some columns (util for almost-zero rows)
-  for($j=0; $j<=$l; $j++) $this->content[$i1][$cols[$j]] += $c*$this->content[$i2][$cols[$j]];
+  for($j=0; $j<=$l; $j++) $this->data[$i1][$cols[$j]] += $c*$this->data[$i2][$cols[$j]];
 
 } else { //Operate starting in $j0 column
-  for($j=$j0; $j< $this->width; $j++) $this->content[$i1][$j] += $c*$this->content[$i2][$j] ;
+  for($j=$j0; $j< $this->width; $j++) $this->data[$i1][$j] += $c*$this->data[$i2][$j] ;
 
 }
 
