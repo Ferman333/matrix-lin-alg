@@ -111,7 +111,7 @@ public function __construct(array $arr) {
 *
 * @return array The 2-dimensional array with the entries of the matrix
 */
-public function get_array() { return $this->data; }
+public function get_data() { return $this->data; }
 
 
 
@@ -135,11 +135,11 @@ public function get_h() { return $this->height; }
 
 
 /**
-* Returns the matrix's dimensions as an array [$width,$height]
+* Returns the matrix's dimensions as an array [$height,$width]
 *
-* @return array The dimensions [$width,$height] of the matrix
+* @return array The dimensions [$height,$width] of the matrix
 */
-public function get_dims() { return [$this->width, $this->height]; }
+public function get_dims() { return [$this->height, $this->width]; }
 
 
 
@@ -297,12 +297,12 @@ return new Matrix($M);
 */
 public static function equals(Matrix $A,Matrix $B,$lim=0) {
 
-if($lim==0) return $A->get_array() == $B->get_array();
+if($lim==0) return $A->get_data() == $B->get_data();
 else {
   $out = $A->get_dims() == $B->get_dims();
   if($out) {
     for($i=0; $i< $A->get_h(); $i++) {
-      for($j=0; $j< $A->get_w(); $j++) $out =$out&& ( ($A->get_array()[$i][$j] - $B->get_array()[$i][$j]) <$lim ) && ( ($A->get_array()[$i][$j] - $B->get_array()[$i][$j]) >-$lim );
+      for($j=0; $j< $A->get_w(); $j++) $out = $out && ( abs($A->get_data()[$i][$j] - $B->get_data()[$i][$j]) <$lim );
     }
   }
   return $out;
@@ -401,6 +401,26 @@ public static function norm($u) {
 
 
 
+/**
+* Cross product of vectors
+*
+* @param array $u The first vector to multiply
+* @param array $v The second vector to multiply
+* @return array The cross product $u x $v
+*/
+public static function cross_prod(array $u,array $v) {
+
+if(count($u)!=3 || count($v)!=3) throw new DimensionException("The vectors must have 3 dimensions");
+
+$w=array();
+for($i=0; $i<3; $i++) $w[] = $u[($i+1)%3]*$v[($i+2)%3] - $u[($i+2)%3]*$v[($i+1)%3];
+
+return $w;
+}
+
+
+
+
 
 /**
 *Gram-Schmidt orthogonalization of a set of "m" vectors in R^n euclidian space.
@@ -435,7 +455,7 @@ return new Matrix($u);
 */
 public static function euler_angles(Matrix $Rm) {
   #Obtain spherical coordinates of Z* rotated vector (col[2] of $R)
-  $R=$Rm->get_array();
+  $R=$Rm->get_data();
   $th_z= acos($R[2][2]); #Azimutal angle, beta=$th_z
   
   $phi_z= acos( $R[0][2]/sin($th_z) );
@@ -469,13 +489,12 @@ public static function euler_angles(Matrix $Rm) {
 *
 * @return Matrix The transposed matrix of $this
 */
-public function trans() {
-#$A_t= $this->data;
+public static function trans(Matrix $A) {
+
 $B= array(); //New matrix
 
-for($j=0; $j< $this->width; $j++) {
-  $Aj=array();
-  for($i=0; $i< $this->height; $i++) $B[$j][$i] = $this->data[$i][$j];
+for($j=0; $j< $A->get_w(); $j++) {
+  for($i=0; $i< $A->get_h(); $i++) $B[$j][$i] = $A->get_data()[$i][$j];
   }
 
 return new Matrix($B);
@@ -488,13 +507,13 @@ return new Matrix($B);
 *
 * @return float The trace of $this matrix
 */
-public function trace() {
+public static function trace(Matrix $A) {
 
-if(!$this->is_squared()) throw new DimensionException("The matrix must be squared!");
+if(!$A->is_squared()) throw new DimensionException("The matrix must be squared!");
 
 $sum=0;
-for($j=0; $j< $this->width; $j++) {
-  $sum += $this->data[$j][$j];
+for($j=0; $j< $A->get_w(); $j++) {
+  $sum += $A->get_data()[$j][$j];
 }
 
 return $sum;
@@ -534,7 +553,7 @@ elseif(get_class($a)=="Matrix" && get_class($b)=="Matrix") {
   $m=$a->get_w();
   for($i=0; $i<$n; $i++) {
     $ci=array();
-    for($j=0; $j<$m; $j++) $ci[]= $a->get_array()[$i][$j] + $b->get_array()[$i][$j];
+    for($j=0; $j<$m; $j++) $ci[]= $a->get_data()[$i][$j] + $b->get_data()[$i][$j];
     $c[]=$ci;
   }
   return new Matrix($c);
@@ -568,7 +587,7 @@ if(is_array($A)) {
   
   for($i=0; $i< $A->get_h(); $i++) {
     $ci=array();
-    for($j=0; $j< $A->get_w(); $j++) $ci[]= $s*$A->get_array()[$i][$j];
+    for($j=0; $j< $A->get_w(); $j++) $ci[]= $s*$A->get_data()[$i][$j];
     $c[]=$ci;
   }
  return new Matrix($c);
@@ -596,7 +615,7 @@ $C=array();
 for($i=0;$i< $A->get_h(); $i++) {
   for($j=0; $j< $B->get_w(); $j++) {
     $C[$i][$j] = 0;
-    for($k=0 ; $k< $A->get_w(); $k++) $C[$i][$j] += $A->get_array()[$i][$k]*$B->get_array()[$k][$j];
+    for($k=0 ; $k< $A->get_w(); $k++) $C[$i][$j] += $A->get_data()[$i][$k]*$B->get_data()[$k][$j];
   }
 }
 return new Matrix($C);
@@ -661,7 +680,7 @@ public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
 
 public function gauss_jordan(Matrix $Ap,$lim=0.001,$use_cols=false) {
 
-$A=new Matrix($Ap->get_array()); #Duplicate to avoid transforming $A with the row operations
+$A=new Matrix($Ap->get_data()); #Duplicate to avoid transforming $A with the row operations
 
 $n=$A->get_h(); #Matrix nxn
  
@@ -675,7 +694,7 @@ for($j=0; $j<$n; $j++) {
   
   for($i=$j; $i<$n; $i++) { //Looking for a pivot
     
-    if($A->get_array()[$i][$j] > $lim || $A->get_array()[$i][$j] < -$lim) { //If |$x|>$lim it's not zero
+    if($A->get_data()[$i][$j] > $lim || $A->get_data()[$i][$j] < -$lim) { //If |$x|>$lim it's not zero
       
       if($i != $j) { $A->permute_rows($j,$i, $j);    $this->permute_rows($j,$i); } //Pivot
       
@@ -693,14 +712,14 @@ for($j=0; $j<$n; $j++) {
             break; }
   
   
-  $this->scale_row($j, 1/$A->get_array()[$j][$j], 0, $cols,$j);
-  $A->scale_row($j, 1/$A->get_array()[$j][$j], $j); //Normalize pivot
+  $this->scale_row($j, 1/$A->get_data()[$j][$j], 0, $cols,$j);
+  $A->scale_row($j, 1/$A->get_data()[$j][$j], $j); //Normalize pivot
   
   
   for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
-    if($A->get_array()[$i][$j] !=0) {
-          $this->sum_rows($i,$j, -$A->get_array()[$i][$j], 0, $cols,$j);
-          $A->sum_rows($i,$j, -$A->get_array()[$i][$j], $j);
+    if($A->get_data()[$i][$j] !=0) {
+          $this->sum_rows($i,$j, -$A->get_data()[$i][$j], 0, $cols,$j);
+          $A->sum_rows($i,$j, -$A->get_data()[$i][$j], $j);
     }
   } //End second for($i)
   
@@ -711,7 +730,7 @@ for($j=0; $j<$n; $j++) {
   #Elimination of upper terms
   for($j=$n-1; $j>=0; $j--) {
     for($i=$j-1; $i>=0; $i--) {
-      if($A->get_array()[$i][$j]!=0)  $this->sum_rows($i,$j, -$A->get_array()[$i][$j]);
+      if($A->get_data()[$i][$j]!=0)  $this->sum_rows($i,$j, -$A->get_data()[$i][$j]);
     } //End for($i)
      
   } //End second for($j)
@@ -736,7 +755,7 @@ unset($A); #Delete $A duplicate matrix
 */
 public static function det(Matrix $Ap,$lim=0.001) { //
 
-$A=new Matrix($Ap->get_array());
+$A=new Matrix($Ap->get_data());
 $det = 1;
 
 $n=$A->get_h(); #Matrix nxn
@@ -749,7 +768,7 @@ for($j=0; $j<$n; $j++) {
   $fl=false; //Flag to check if matrix is regular (not singular)
   
   for($i=$j; $i<$n; $i++) { //Looking for a pivot
-    if($A->get_array()[$i][$j] >$lim || $A->get_array()[$i][$j] < -$lim) //If |$x|>$lim it's not zero
+    if($A->get_data()[$i][$j] >$lim || $A->get_data()[$i][$j] < -$lim) //If |$x|>$lim it's not zero
        {
          if($i != $j) { $A->permute_rows($j,$i, $j);   $det*=-1; } //Pivot
          
@@ -760,13 +779,13 @@ for($j=0; $j<$n; $j++) {
   if(!$fl) { $det=0;   break; }  #Singular matrix
   
   
-  $det *= $A->get_array()[$j][$j];
-  $A->scale_row($j, 1/$A->get_array()[$j][$j], $j); //Normalize pivot
+  $det *= $A->get_data()[$j][$j];
+  $A->scale_row($j, 1/$A->get_data()[$j][$j], $j); //Normalize pivot
   
   
   for($i=$j+1; $i<$n; $i++) { // Elimination, for $i rows after than $j
-    if($A->get_array()[$i][$j] !=0) {
-           $A->sum_rows($i,$j, -$A->get_array()[$i][$j], $j);
+    if($A->get_data()[$i][$j] !=0) {
+           $A->sum_rows($i,$j, -$A->get_data()[$i][$j], $j);
     }
   } //End for($i)
 
@@ -789,14 +808,13 @@ return $det;
 
 #Permutes $i1 and $i2 rows
 /**
- * Permutes (swaps) two rows in the matrix.
+ * Permutes (swaps) two rows in the matrix. The matrix that calls this method is transformed by this row operation.
  * 
  * @param int $i1 The first row to swap (counted from 0 to $height-1)
  * @param int $i2 The second row to swap (counted from 0 to $height-1)
  * @param int $j0 Index of the first column to take into account while swapping the rows (i.e., just the columns $j>=$j0 will be swapped). Util if the columns before $j0 are already equal.
  * @param array $cols A list or array with the columns to be taken into account while swapping, i.e., just the columns in this list will be swapped. Util if you know in which columns the rows are equal.
  * @param int $l Length of the $cols list to be taken into account while swapping, i.e., just the first $l elements of $cols will be swapped.
- * @return Matrix The permuted matrix that called this method.
  */
 public function permute_rows($i1,$i2, $j0=0, $cols=array(), $l=0) { 
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
@@ -813,14 +831,13 @@ if(count($cols)!=0) { //Just operate with some columns (util for almost-zero row
 
 #Multiplies a row by a scalar
 /**
- * Scales a row in the matrix.
+ * Scales a row in the matrix. The matrix that calls this method is transformed by this row operation.
  * 
  * @param int $i The row to be scaled (counted from 0 to $height-1)
  * @param int $c The scalar
  * @param int $j0 Index of the first column to take into account while scaling the row (i.e., just the columns $j>=$j0 will be scaled). Util if the columns before $j0 are zero.
  * @param array $cols A list or array with the columns to be taken into account while scaling, i.e., just the columns in this list will be scaled. Util if you know in which columns the row is not zero.
  * @param int $l Length of the $cols list to be taken into account while scaling, i.e., just the first $l elements of $cols will be scaled.
- * @return Matrix The matrix that called this method with its $i-th row scaled.
  */
 public function scale_row($i,$c, $j0=0, $cols=array(),$l=0) { 
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
@@ -838,14 +855,13 @@ if(count($cols)!=0) { //Just operate with some columns (util for almost-zero row
 
 #Adds $c times $i2 row to the $i1 row
 /**
- * Adds a scaled row in the matrix onto another row.
+ * Adds a scaled row in the matrix onto another row. The matrix that calls this method is transformed by this row operation.
  * 
  * @param int $i1 The row to be updated after adding the $i2 row (counted from 0 to $height-1)
  * @param int $i2 The row to be added onto $i1 (counted from 0 to $height-1)
  * @param int $j0 Index of the first column to take into account while adding the rows (i.e., just the columns $j>=$j0 will be added). Util if the columns before $j0 in the row $i2 are zero.
  * @param array $cols A list or array with the columns to be taken into account while adding, i.e., just the columns in this list will be added. Util if you know in which columns the row $i2 is not zero.
  * @param int $l Length of the $cols list to be taken into account while adding the rows, i.e., just the first $l elements of $cols will be added.
- * @return Matrix The matrix that called this method after adding the scaled $i2 row onto the $i1 one.
  */
 public function sum_rows($i1,$i2,$c, $j0=0, $cols=array(),$l=0) { 
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
