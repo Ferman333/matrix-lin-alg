@@ -1,6 +1,15 @@
 <?php
 /**
+* A package with different matrix classes for solving linear algebra problems.
+* @author Droid Roar
+* @version 1.0.0
+* @package LinAlg
+*/
+
+/**
 * Class to catch all possible errors with matrices
+* @package LinAlg
+* @subpackage Exceptions
 */
 class MatrixException extends Exception {
 
@@ -14,6 +23,8 @@ public function __construct($msg, $code=0, $previous=null) {
 
 /**
 * Class to catch errors related with size of matrices
+* @package LinAlg
+* @subpackage Exceptions
 */
 class DimensionException extends MatrixException {
 
@@ -29,6 +40,8 @@ public function __construct($msg="Matrices or vectors are not the same size", $c
 
 /**
 * Class to catch errors related with construction of matrices (eg. entries are not arrays, rows are not of same size, etc.)
+* @package LinAlg
+* @subpackage Exceptions
 */
 class BadFormationException extends MatrixException {
 
@@ -41,13 +54,22 @@ public function __construct($msg="Error while constructing the matrix. Ensure th
 
 
 /**
-* Class with matrix operations, and linear algebra methods
+* Class with general matrix operations, and basic linear algebra methods
+* @package LinAlg
 *
 */
 
 class Matrix {
 
+/**
+* @var array<array<float|int>> $data The content of the matrix, as a 2-dim array
+*/
 private $data=array(); //Matrix's data (as array)
+
+/**
+* @var float|int $width The width (num. of columns) of the matrix.
+* @var float|int $height The height (num. of rows) of the matrix.
+*/
 private $width=0, $height;
 
 
@@ -57,6 +79,7 @@ private $width=0, $height;
 * Constructor of the class. It builds the matrix from an array input
 *
 * @param array $arr A 2-dimensional array, with all its array arguments of same size. This array contains the matrix's entries
+* @throws BadFormationException If the array for constructing the matrix is invalid, this method will throw an exception
 */
 public function __construct(array $arr) {
   $fl=true;
@@ -107,9 +130,27 @@ public function __construct(array $arr) {
 
 
 /**
+* Method to represent the matrix as a string.
+*
+* @return string The matrix's entries separated in rows and columns
+*/
+public function __toString() {
+  $out="";
+  foreach($this->data as $M_i) {
+    foreach($M_i as $x) $out= $out . round($x, 5) . " ";
+  $out = $out. "\n";
+  }
+  
+  return $out;
+}
+
+
+
+
+/**
 * Returns the matrix as an array object
 *
-* @return array The 2-dimensional array with the entries of the matrix
+* @return array<array<float|int>> The 2-dimensional array with the entries of the matrix
 */
 public function get_data() { return $this->data; }
 
@@ -137,7 +178,7 @@ public function get_h() { return $this->height; }
 /**
 * Returns the matrix's dimensions as an array [$height,$width]
 *
-* @return array The dimensions [$height,$width] of the matrix
+* @return array<int> The dimensions [$height,$width] of the matrix
 */
 public function get_dims() { return [$this->height, $this->width]; }
 
