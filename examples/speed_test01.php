@@ -1,5 +1,5 @@
 <?php
-include("matrices.php");
+include("../matrices.php");
 
 /*$M = new Matrix( [
        [1,1,1,1,1,1],
@@ -33,7 +33,7 @@ $n=5;#250;
 #$bm = Matrix::random_matrix($n,1)->toArray();
 #for($k=0;$k<$n;$k++) $b[$k] = $bm[$k][0];
 
-echo "Matriz generada\n";
+echo "Matrix created\n";
 
 
 
@@ -42,7 +42,7 @@ $M_inv = Matrix::inv_GJ($M); #$X= Matrix::solve_GJ($M,$b);
 $dt=hrtime(true)-$t1;
 $dt=$dt/1e+6; #To milliseconds
 
-echo "Matriz invertida ($dt ms). Falta verificar...\n";
+echo "Matrix inverted ($dt ms). Checking...\n";
 
 
 
@@ -53,15 +53,14 @@ echo "Matriz invertida ($dt ms). Falta verificar...\n";
 
 
 
-echo "M^{-1} es en verdad la inversa? ".Matrix::equals(Matrix::prod($M,$M_inv), Matrix::get_identity($n), 1e-5)."\n";
+echo "Is M^{-1} really the inverse? ".Matrix::equals(Matrix::prod($M,$M_inv), Matrix::get_identity($n), 1e-5)."\n";
 #Matrix::to_col($b)
 
-echo "Determinante: ";
+echo "Determinant: ";
 $t1=hrtime(true);
 echo Matrix::det($M);
 echo "\n". (hrtime(true)-$t1)/1e+6 . " ms\n";
 
-//Test comment 1
 
 
 ?>
