@@ -945,7 +945,7 @@ public function sum_rows($i1,$i2,$c, $j0=0, $cols=array(),$l=-1) {
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
   $ll= ($l==-1)? count($cols)-1 : $l;
   for($j=0; $j<=$ll; $j++) $this->data[$i1][$cols[$j]] += $c*$this->data[$i2][$cols[$j]];
-
+  
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) $this->data[$i1][$j] += $c*$this->data[$i2][$j] ;
 }
@@ -996,11 +996,10 @@ public static function exp(Matrix $A, $N=10) {
 /**
 * LU decomposition.
 *
-* @param Matrix $Ap bla bla...
-*
+* @param Matrix $Ap Squared regular matrix to be decomposed into L*U product
 * @param float $lim Limit error for numerical stability, if |$x|<$lim it counts like zero. Util for pivoting
 *
-* @param boolean $use_cols If it's true, it avoids doing the row operations in all columns using a list of the columns which entries in the actual row are not zero. Util if almost all the row is zero to save computation time (e.g., the identity), but it's insecure and the results could be innaccurate. Set it to false if you are not secure of how many zeros have the rows
+* @return array<Matrix> A list with the matrix factors L,U, or L1,P1,...,U in case there was pivoting
 */
 
 public static function LU_decomposition(Matrix $Ap, $lim=0.001) { #, $use_cols=false
@@ -1022,10 +1021,16 @@ for($j=0; $j<$n; $j++) {
     
     if( abs($U->get_data()[$i][$j]) > $lim ) { //If |$x|>$lim it's not zero
       
-      if($i != $j) { $U->permute_rows($j,$i, $j);
-                     $L->permute_rows($j,$i, 0, [$j,$i]);   $out[]=$L; #Save the permutation as part of factorization
-                     $L->permute_rows($j,$i, 0, [$j,$i]); #Take back to the identity
-                     } //Pivot
+      if($i != $j) { //Pivot
+        if($j!=0) { #If $j!=0, save the previous lower matrix $L and reset it to the identity to save the permutation
+          $out[]= $L;
+          $cols=[];
+          $L=Matrix::get_identity($n);
+        }
+        $U->permute_rows($j,$i, $j);
+        $L->permute_rows($j,$i, 0, [$j,$i]);   $out[]=$L; #Save the permutation as part of factorization
+        $L->permute_rows($j,$i, 0, [$j,$i]); #Take back to the identity
+      } #End pivot
       
       /*if($use_cols) { //Save columns used in the permutation
                         $tmp = ( isset($cols[$j])? $cols[$j]:$j );
@@ -1041,17 +1046,21 @@ for($j=0; $j<$n; $j++) {
             break; }
   
   
+  $cols[] = $j;
   $uj= $U->get_data()[$j][$j];
   for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
     if($U->get_data()[$i][$j] !=0) {
-          #$this->sum_rows($i,$j, -$U->get_data()[$i][$j], 0, $cols,$j);
+          $L->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, 0, $cols);
           $U->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, $j);
-          $L->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, 0, [$j,$i]);
+          
     }
   } //End second for($i)
   
   
-} //End first for($j)
+} //End for($j)
+
+$out[] = $L; #For now it gives L^(-1) as a result
+$out[] = $U;
 
 
 return $out;
