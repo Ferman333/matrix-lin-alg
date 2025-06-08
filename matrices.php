@@ -303,6 +303,45 @@ return new Matrix($I);
 
 
 
+/**
+* Obtains nxn scalar matrix diag($s,..., $s)
+*
+* @param int $n The order of nxn identity
+* @param float|int $s The scalar in the diagonal
+* @return Matrix The nxn diagonal matrix diag($s,..., $s)
+*/
+public static function get_scalar($n, $s=1) {
+$S=array();
+for($i=0; $i<$n; $i++) {
+  for($j=0; $j<$n; $j++) {
+    if($j==$i) $S[$i][$j] = $s;
+    else $S[$i][$j] = 0;
+  }
+}
+return new Matrix($S);
+}
+
+
+
+
+
+/**
+* Obtains nxm zero matrix
+*
+* @param int $n The height of matrix
+* @param int $m The width of matrix
+* @return Matrix The nxm zero matrix
+*/
+public static function get_zero($n, $m) {
+$Z=array();
+for($i=0; $i<$n; $i++) {
+  for($j=0; $j<$m; $j++) $Z[$i][$j] = 0;
+}
+return new Matrix($Z);
+}
+
+
+
 
 
 /**
@@ -620,16 +659,14 @@ public static function scale($s, Matrix|array $A) {
 if(is_array($A)) {
   $c=array();
   
-  for($i=0; $i<sizeof($A); $i++) $c[] = $s*$A[$i];
+  for($i=0; $i<count($A); $i++) $c[] = $s*$A[$i];
   return $c;
   
 } elseif(get_class($A)=="Matrix") {
-  $c=array();
+  $c=$A->get_data();
   
   for($i=0; $i< $A->get_h(); $i++) {
-    $ci=array();
-    for($j=0; $j< $A->get_w(); $j++) $ci[]= $s*$A->get_data()[$i][$j];
-    $c[]=$ci;
+    for($j=0; $j< $A->get_w(); $j++) $c[$i][$j] *= $s;
   }
  return new Matrix($c);
  
@@ -719,13 +756,12 @@ public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
 * @param boolean $use_cols If it's true, it avoids doing the row operations in all columns using a list of the columns which entries in the actual row are not zero. Util if almost all the row is zero to save computation time (e.g., the identity), but it's insecure and the results could be innaccurate. Set it to false if you are not secure of how many zeros have the rows
 */
 
-public function gauss_jordan(Matrix $Ap,$lim=0.001,$use_cols=false) {
+public function gauss_jordan(Matrix $Ap, $lim=0.001, $use_cols=false) {
+
+if(!$Ap->is_squared()) throw new DimensionException("Not squared matrix given!");
 
 $A=new Matrix($Ap->get_data()); #Duplicate to avoid transforming $A with the row operations
-
 $n=$A->get_h(); #Matrix nxn
- 
-if($A->get_w() != $n) throw new DimensionException("Not squared matrix in argument.");
 
 $cols=array();
 
@@ -735,7 +771,7 @@ for($j=0; $j<$n; $j++) {
   
   for($i=$j; $i<$n; $i++) { //Looking for a pivot
     
-    if($A->get_data()[$i][$j] > $lim || $A->get_data()[$i][$j] < -$lim) { //If |$x|>$lim it's not zero
+    if( abs($A->get_data()[$i][$j]) > $lim ) { //If |$x|>$lim it's not zero
       
       if($i != $j) { $A->permute_rows($j,$i, $j);    $this->permute_rows($j,$i); } //Pivot
       
@@ -749,7 +785,7 @@ for($j=0; $j<$n; $j++) {
   
   } //End first for($i)
   
-  if(!$fl) { throw new MatrixException("Singular matrix. Try to put a bigger limit (currently \$lim=$lim). If error persists, the matrix is not invertible.");
+  if(!$fl) { throw new MatrixException("Singular matrix. Try to put a smaller limit (currently \$lim=$lim). If error persists, the matrix is not invertible.");
             break; }
   
   
@@ -794,14 +830,13 @@ unset($A); #Delete $A duplicate matrix
 * @param float $lim Limit to adjust error by rounding, if |$x|<$lim it counts like zero. Util for pivoting
 * @return float The determinant det($Ap) of matrix $Ap
 */
-public static function det(Matrix $Ap,$lim=0.001) { //
+public static function det(Matrix $Ap,$lim=0.001) {
 
-$A=new Matrix($Ap->get_data());
+if(!$Ap->is_squared()) throw new DimensionException("Not square matrix given!");
+
+$A=new Matrix($Ap->get_data()); #Clone the argument to avoid editing it with the row operations
 $det = 1;
-
 $n=$A->get_h(); #Matrix nxn
- 
-if($A->get_w() != $n) throw new DimensionException("Not square matrix given!");
 
 
 //Run over $j columns, to obtain an upper-triangular matrix
@@ -809,7 +844,7 @@ for($j=0; $j<$n; $j++) {
   $fl=false; //Flag to check if matrix is regular (not singular)
   
   for($i=$j; $i<$n; $i++) { //Looking for a pivot
-    if($A->get_data()[$i][$j] >$lim || $A->get_data()[$i][$j] < -$lim) //If |$x|>$lim it's not zero
+    if( abs($A->get_data()[$i][$j]) >$lim ) //If |$x|>$lim it's not zero
        {
          if($i != $j) { $A->permute_rows($j,$i, $j);   $det*=-1; } //Pivot
          
@@ -857,9 +892,10 @@ return $det;
  * @param array $cols A list or array with the columns to be taken into account while swapping, i.e., just the columns in this list will be swapped. Util if you know in which columns the rows are equal.
  * @param int $l Length of the $cols list to be taken into account while swapping, i.e., just the first $l elements of $cols will be swapped.
  */
-public function permute_rows($i1,$i2, $j0=0, $cols=array(), $l=0) { 
+public function permute_rows($i1,$i2, $j0=0, $cols=array(), $l=-1) { 
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
-  for($j=0; $j<=$l; $j++) { $temp = $this->data[$i1][$cols[$j]]; $this->data[$i1][$cols[$j]] = $this->data[$i2][$cols[$j]]; $this-> data[$i2][$cols[$j]] = $temp; }
+  $ll= ($l==-1)? count($cols)-1 : $l;
+  for($j=0; $j<=$ll; $j++) { $temp = $this->data[$i1][$cols[$j]]; $this->data[$i1][$cols[$j]] = $this->data[$i2][$cols[$j]]; $this-> data[$i2][$cols[$j]] = $temp; }
   
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) { $temp = $this->data[$i1][$j]; $this->data[$i1][$j] = $this->data[$i2][$j]; $this->data[$i2][$j] = $temp; }
@@ -880,9 +916,10 @@ if(count($cols)!=0) { //Just operate with some columns (util for almost-zero row
  * @param array $cols A list or array with the columns to be taken into account while scaling, i.e., just the columns in this list will be scaled. Util if you know in which columns the row is not zero.
  * @param int $l Length of the $cols list to be taken into account while scaling, i.e., just the first $l elements of $cols will be scaled.
  */
-public function scale_row($i,$c, $j0=0, $cols=array(),$l=0) { 
+public function scale_row($i,$c, $j0=0, $cols=array(),$l=-1) { 
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
-  for($j=0; $j<=$l; $j++) $this->data[$i][$cols[$j]] *= $c;
+  $ll= ($l==-1)? count($cols)-1 : $l;
+  for($j=0; $j<=$ll; $j++) $this->data[$i][$cols[$j]] *= $c;
 
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) $this->data[$i][$j] *= $c;
@@ -904,9 +941,10 @@ if(count($cols)!=0) { //Just operate with some columns (util for almost-zero row
  * @param array $cols A list or array with the columns to be taken into account while adding, i.e., just the columns in this list will be added. Util if you know in which columns the row $i2 is not zero.
  * @param int $l Length of the $cols list to be taken into account while adding the rows, i.e., just the first $l elements of $cols will be added.
  */
-public function sum_rows($i1,$i2,$c, $j0=0, $cols=array(),$l=0) { 
+public function sum_rows($i1,$i2,$c, $j0=0, $cols=array(),$l=-1) { 
 if(count($cols)!=0) { //Just operate with some columns (util for almost-zero rows)
-  for($j=0; $j<=$l; $j++) $this->data[$i1][$cols[$j]] += $c*$this->data[$i2][$cols[$j]];
+  $ll= ($l==-1)? count($cols)-1 : $l;
+  for($j=0; $j<=$ll; $j++) $this->data[$i1][$cols[$j]] += $c*$this->data[$i2][$cols[$j]];
 
 } else { //Operate starting in $j0 column
   for($j=$j0; $j< $this->width; $j++) $this->data[$i1][$j] += $c*$this->data[$i2][$j] ;
@@ -917,5 +955,114 @@ if(count($cols)!=0) { //Just operate with some columns (util for almost-zero row
 
 
 
-} //End class
+
+
+############
+### Numeric operations
+############
+
+/**
+* Obtains the exponential matrix
+*
+* @param Matrix $A The matrix argument
+* @param int $N The number of iterations in the Taylor series to approximate the exponential
+* @return Matrix The exponencial e^$A
+*/
+public static function exp(Matrix $A, $N=10) {
+  if(!$A->is_squared()) throw new DimensionException("Not square matrix given!");
+  
+  $n=$A->get_h();
+  $out= Matrix::get_zero($n,$n);
+  $prod_m=Matrix::get_identity($n);
+  $fact = 1;
+  
+  for($k=0; $k<$N; $k++) {
+    $out = Matrix::sum($out, $prod_m);
+    
+    if($k==$N-1) break; #Avoid doing the following matrix product in the last step
+    
+    $prod_m = Matrix::prod($prod_m, $A); # Obtain A^(k+1)
+    $prod_m = Matrix::scale(1.0/($k+1), $prod_m); # Obtain A^(k+1)/(k+1)!
+  }
+  
+  return $out;
+}
+
+
+
+
+
+
+/**
+* LU decomposition.
+*
+* @param Matrix $Ap bla bla...
+*
+* @param float $lim Limit error for numerical stability, if |$x|<$lim it counts like zero. Util for pivoting
+*
+* @param boolean $use_cols If it's true, it avoids doing the row operations in all columns using a list of the columns which entries in the actual row are not zero. Util if almost all the row is zero to save computation time (e.g., the identity), but it's insecure and the results could be innaccurate. Set it to false if you are not secure of how many zeros have the rows
+*/
+
+public static function LU_decomposition(Matrix $Ap, $lim=0.001) { #, $use_cols=false
+
+if(!$Ap->is_squared()) throw new DimensionException("Not squared matrix given!");
+
+$U=new Matrix($Ap->get_data()); #Duplicate to avoid transforming $A with the row operations
+$n=$U->get_h(); #Matrix nxn
+$L=Matrix::get_identity($n);
+
+$out=array();
+$cols=array();
+
+//Run over the $j columns, to obtain an upper-triangular matrix
+for($j=0; $j<$n; $j++) {
+  $fl=false; //Flag to check if matrix is regular (not singular)
+  
+  for($i=$j; $i<$n; $i++) { //Looking for a pivot
+    
+    if( abs($U->get_data()[$i][$j]) > $lim ) { //If |$x|>$lim it's not zero
+      
+      if($i != $j) { $U->permute_rows($j,$i, $j);
+                     $L->permute_rows($j,$i, 0, [$j,$i]);   $out[]=$L; #Save the permutation as part of factorization
+                     $L->permute_rows($j,$i, 0, [$j,$i]); #Take back to the identity
+                     } //Pivot
+      
+      /*if($use_cols) { //Save columns used in the permutation
+                        $tmp = ( isset($cols[$j])? $cols[$j]:$j );
+                        $cols[$j] = ( isset($cols[$i])? $cols[$i]:$i );
+                        $cols[$i] = $tmp; }*/
+      
+      $fl=true; break;
+    } //End if(|$x|>$lim)
+  
+  } //End first for($i)
+  
+  if(!$fl) { throw new MatrixException("Singular matrix. Try to put a smaller limit (currently \$lim=$lim). If error persists, the matrix is not invertible.");
+            break; }
+  
+  
+  $uj= $U->get_data()[$j][$j];
+  for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
+    if($U->get_data()[$i][$j] !=0) {
+          #$this->sum_rows($i,$j, -$U->get_data()[$i][$j], 0, $cols,$j);
+          $U->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, $j);
+          $L->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, 0, [$j,$i]);
+    }
+  } //End second for($i)
+  
+  
+} //End first for($j)
+
+
+return $out;
+}
+
+
+
+
+
+
+} //End Matrix class
+
+
 ?>  
