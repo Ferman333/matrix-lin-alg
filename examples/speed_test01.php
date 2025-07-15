@@ -26,13 +26,6 @@ $M = new Matrix( [
 $b = [1, -4, 24, -35, 12];
 
 
-
-$n=5;#250;
-
-#$M = Matrix::random_matrix($n,$n);
-#$bm = Matrix::random_matrix($n,1)->toArray();
-#for($k=0;$k<$n;$k++) $b[$k] = $bm[$k][0];
-
 echo "Matrix created\n";
 
 
@@ -45,21 +38,16 @@ $dt=$dt/1e+6; #To milliseconds
 echo "Matrix inverted ($dt ms). Checking...\n";
 
 
-
-#$M_inv->show(4);
-
-#print("\nM*M^{-1}=\n");
-#Matrix::prod($M,$X) ->show(2);
-
-
-
-echo "Is M^{-1} really the inverse? ".Matrix::equals(Matrix::prod($M,$M_inv), Matrix::get_identity($n), 1e-5)."\n";
+#Check if M_inv is the inverse: multiply M*M_inv
+$P= Matrix::prod($M,$M_inv);
+echo "Is M^{-1} really the inverse? ".Matrix::equals($P, Matrix::get_identity($M->get_w()), 1e-5)."\n";
+echo $P;
 #Matrix::to_col($b)
 
 echo "Determinant: ";
 $t1=hrtime(true);
 echo Matrix::det($M);
-echo "\n". (hrtime(true)-$t1)/1e+6 . " ms\n";
+echo "\n(calculated in ". (hrtime(true)-$t1)/1e+6 . " ms)\n";
 
 
 
