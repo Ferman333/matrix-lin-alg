@@ -788,7 +788,7 @@ for($j=0; $j<$n; $j++) {
                     $cols[$j] = ( isset($cols[$pivot_row])? $cols[$pivot_row]:$pivot_row );
                     $cols[$pivot_row] = $tmp; }
   
-  if($pivot_row != $j) { $A->permute_rows($j,$pivot_row, $j);    $this->permute_rows($j,$pivot_row); } //Permute
+  if($pivot_row != $j) { $A->permute_rows($j,$pivot_row, $j);    $this->permute_rows($j,$pivot_row, 0, [...$cols]); } //Permute
   
   
   $this->scale_row($j, 1/$A->get_data()[$j][$j], 0, $cols,$j);
@@ -811,7 +811,7 @@ for($j=0; $j<$n; $j++) {
     for($i=$j-1; $i>=0; $i--) {
       if($A->get_data()[$i][$j]!=0)  $this->sum_rows($i,$j, -$A->get_data()[$i][$j]);
     } //End for($i)
-     
+    
   } //End second for($j)
 
 
@@ -832,7 +832,7 @@ unset($A); #Delete $A duplicate matrix
 * @param float $lim Limit to adjust error by rounding, if |$x|<$lim it counts like zero. Util for pivoting
 * @return float The determinant det($Ap) of matrix $Ap
 */
-public static function det(Matrix $Ap,$lim=0.001) {
+public static function det(Matrix $Ap,$lim=1e-6) {
 
 if(!$Ap->is_squared()) throw new DimensionException("Not square matrix given!");
 
@@ -843,30 +843,33 @@ $n=$A->get_h(); #Matrix nxn
 
 //Run over $j columns, to obtain an upper-triangular matrix
 for($j=0; $j<$n; $j++) {
-  $fl=false; //Flag to check if matrix is regular (not singular)
   
-  for($i=$j; $i<$n; $i++) { //Looking for a pivot
-    if( abs($A->get_data()[$i][$j]) >$lim ) //If |$x|>$lim it's not zero
-       {
-         if($i != $j) { $A->permute_rows($j,$i, $j);   $det*=-1; } //Pivot
-         
-         $fl=true; break;
-        } //End if(|$x|>$lim)
-  } //End for($i)
-  
-  if(!$fl) { $det=0;   break; }  #Singular matrix
-  
-  
-  $det *= $A->get_data()[$j][$j];
-  $A->scale_row($j, 1/$A->get_data()[$j][$j], $j); //Normalize pivot
-  
-  
-  for($i=$j+1; $i<$n; $i++) { // Elimination, for $i rows after than $j
-    if($A->get_data()[$i][$j] !=0) {
-           $A->sum_rows($i,$j, -$A->get_data()[$i][$j], $j);
+  $pivot_row = $j;
+  for($i=$j+1; $i<$n; $i++) { //Looking for a pivot
+    
+    if( abs($A->get_data()[$i][$j]) > abs($A->get_data()[$pivot_row][$j]) ) { //Looking for the absolute-maximum pivot
+      $pivot_row = $i; //Update the pivot
     }
-  } //End for($i)
 
+  } //End first for($i)
+  
+  #If pivot is zero (lesser than the limit $lim), then the matrix is singular
+  if(abs($A->get_data()[$pivot_row][$j]) < $lim) {
+    $det = 0;
+    break;
+  }
+  
+  if($pivot_row != $j) { $A->permute_rows($j,$pivot_row, $j); $det *= -1; } //Permute
+  
+  
+  for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
+    if($A->get_data()[$i][$j] !=0) {
+          $A->sum_rows($i,$j, -$A->get_data()[$i][$j]/$A->get_data()[$j][$j], $j);
+    }
+  } //End second for($i)
+  
+  //The determinant is the product of the diagonal elements
+  $det *= $A->get_data()[$j][$j];
 } //End for($j)
 
 
