@@ -1002,7 +1002,7 @@ public static function exp(Matrix $A, $N=10) {
 * @return array<Matrix> A list with the matrix factors L,U, or L1,P1,...,U in case there was pivoting
 */
 
-public static function LU_decomposition(Matrix $Ap, $lim=0.001) { #, $use_cols=false
+public static function LU_decomposition(Matrix $Ap, $lim=1e-6) { #, $use_cols=false
 
 if(!$Ap->is_squared()) throw new DimensionException("Not squared matrix given!");
 
@@ -1017,7 +1017,7 @@ $cols=array();
 for($j=0; $j<$n; $j++) {
   $fl=false; //Flag to check if matrix is regular (not singular)
   
-  for($i=$j; $i<$n; $i++) { //Looking for a pivot
+  for($i=$j; $i<$n; $i++) { //Looking for a pivot (for now, the pivoting is unstable)
     
     if( abs($U->get_data()[$i][$j]) > $lim ) { //If |$x|>$lim it's not zero
       
@@ -1050,7 +1050,7 @@ for($j=0; $j<$n; $j++) {
   $uj= $U->get_data()[$j][$j];
   for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
     if($U->get_data()[$i][$j] !=0) {
-          $L->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, 0, $cols);
+          $L->sum_rows($i,$j, $U->get_data()[$i][$j]/$uj, 0, [$j]);
           $U->sum_rows($i,$j, -$U->get_data()[$i][$j]/$uj, $j);
           
     }
@@ -1059,7 +1059,7 @@ for($j=0; $j<$n; $j++) {
   
 } //End for($j)
 
-$out[] = $L; #For now it gives L^(-1) as a result
+$out[] = $L;
 $out[] = $U;
 
 
