@@ -713,7 +713,7 @@ return new Matrix($C);
 * @param float $lim The limit error for numerical stability. If |x|<$lim, "x" counts as zero. Util for pivoting
 * @return Matrix The inverse of $M
 */
-public static function inv_GJ(Matrix $M, $lim=1e-6) {
+public static function inv_GJ(Matrix $M, $lim=0.001) {
   $I=Matrix::get_identity($M->get_w());
   //$M must be squared!!
   $I->gauss_jordan($M,$lim,true); //$use_cols=true saves computational time
@@ -734,7 +734,7 @@ public static function inv_GJ(Matrix $M, $lim=1e-6) {
 * @param float $lim The limit error for numerical stability. If |x|<$lim, "x" counts as zero. Util for pivoting
 * @return Matrix The solution "x" as a column matrix
 */
-public static function solve_GJ(Matrix $M,$b_arr, $lim=1e-6) {
+public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
   $b=Matrix::to_col($b_arr); //Column $b of system $A*$x = $b
   $b->gauss_jordan($M,$lim);
   return $b;
@@ -756,7 +756,7 @@ public static function solve_GJ(Matrix $M,$b_arr, $lim=1e-6) {
 * @param boolean $use_cols If it's true, it avoids doing the row operations in all columns using a list of the columns which entries in the actual row are not zero. Util if almost all the row is zero to save computation time (e.g., the identity), but it's insecure and the results could be innaccurate. Set it to false if you are not secure of how many zeros have the rows
 */
 
-public function gauss_jordan(Matrix $Ap, $lim=1e-6, $use_cols=false) {
+public function gauss_jordan(Matrix $Ap, $lim=0.001, $use_cols=false) {
 
 if(!$Ap->is_squared()) throw new DimensionException("Not squared matrix given!");
 
@@ -767,28 +767,26 @@ $cols=array();
 
 //Run over the $j columns, to obtain an upper-triangular matrix
 for($j=0; $j<$n; $j++) {
+  $fl=false; //Flag to check if matrix is regular (not singular)
   
-  $pivot_row = $j;
-  for($i=$j+1; $i<$n; $i++) { //Looking for a pivot
+  for($i=$j; $i<$n; $i++) { //Looking for a pivot
     
-    if( abs($A->get_data()[$i][$j]) > abs($A->get_data()[$pivot_row][$j]) ) { //Looking for the absolute-maximum pivot
-      $pivot_row = $i; //Update the pivot
-    }
-
+    if( abs($A->get_data()[$i][$j]) > $lim ) { //If |$x|>$lim it's not zero
+      
+      if($i != $j) { $A->permute_rows($j,$i, $j);    $this->permute_rows($j,$i); } //Pivot
+      
+      if($use_cols) { //Save columns used in the permutation
+                        $tmp = ( isset($cols[$j])? $cols[$j]:$j );
+                        $cols[$j] = ( isset($cols[$i])? $cols[$i]:$i );
+                        $cols[$i] = $tmp; }
+      
+      $fl=true; break;
+    } //End if(|$x|>$lim)
+  
   } //End first for($i)
   
-  #If pivot is zero (lesser than the limit $lim), then the matrix is singular
-  if(abs($A->get_data()[$pivot_row][$j]) < $lim) {
-    throw new MatrixException("Singular matrix. Try to put a smaller limit (currently \$lim=$lim). If error persists, the matrix is not invertible.");
-    break;
-  }
-
-  if($use_cols) { //Save columns used in the permutation
-                    $tmp = ( isset($cols[$j])? $cols[$j]:$j );
-                    $cols[$j] = ( isset($cols[$pivot_row])? $cols[$pivot_row]:$pivot_row );
-                    $cols[$pivot_row] = $tmp; }
-  
-  if($pivot_row != $j) { $A->permute_rows($j,$pivot_row, $j);    $this->permute_rows($j,$pivot_row, 0, [...$cols]); } //Permute
+  if(!$fl) { throw new MatrixException("Singular matrix. Try to put a smaller limit (currently \$lim=$lim). If error persists, the matrix is not invertible.");
+            break; }
   
   
   $this->scale_row($j, 1/$A->get_data()[$j][$j], 0, $cols,$j);
@@ -811,7 +809,7 @@ for($j=0; $j<$n; $j++) {
     for($i=$j-1; $i>=0; $i--) {
       if($A->get_data()[$i][$j]!=0)  $this->sum_rows($i,$j, -$A->get_data()[$i][$j]);
     } //End for($i)
-    
+     
   } //End second for($j)
 
 
@@ -832,7 +830,7 @@ unset($A); #Delete $A duplicate matrix
 * @param float $lim Limit to adjust error by rounding, if |$x|<$lim it counts like zero. Util for pivoting
 * @return float The determinant det($Ap) of matrix $Ap
 */
-public static function det(Matrix $Ap,$lim=1e-6) {
+public static function det(Matrix $Ap,$lim=0.001) {
 
 if(!$Ap->is_squared()) throw new DimensionException("Not square matrix given!");
 
@@ -843,33 +841,30 @@ $n=$A->get_h(); #Matrix nxn
 
 //Run over $j columns, to obtain an upper-triangular matrix
 for($j=0; $j<$n; $j++) {
+  $fl=false; //Flag to check if matrix is regular (not singular)
   
-  $pivot_row = $j;
-  for($i=$j+1; $i<$n; $i++) { //Looking for a pivot
-    
-    if( abs($A->get_data()[$i][$j]) > abs($A->get_data()[$pivot_row][$j]) ) { //Looking for the absolute-maximum pivot
-      $pivot_row = $i; //Update the pivot
-    }
-
-  } //End first for($i)
+  for($i=$j; $i<$n; $i++) { //Looking for a pivot
+    if( abs($A->get_data()[$i][$j]) >$lim ) //If |$x|>$lim it's not zero
+       {
+         if($i != $j) { $A->permute_rows($j,$i, $j);   $det*=-1; } //Pivot
+         
+         $fl=true; break;
+        } //End if(|$x|>$lim)
+  } //End for($i)
   
-  #If pivot is zero (lesser than the limit $lim), then the matrix is singular
-  if(abs($A->get_data()[$pivot_row][$j]) < $lim) {
-    $det = 0;
-    break;
-  }
-  
-  if($pivot_row != $j) { $A->permute_rows($j,$pivot_row, $j); $det *= -1; } //Permute
+  if(!$fl) { $det=0;   break; }  #Singular matrix
   
   
-  for($i=$j+1; $i<$n; $i++) { // Elimination, for the $i rows after than $j
-    if($A->get_data()[$i][$j] !=0) {
-          $A->sum_rows($i,$j, -$A->get_data()[$i][$j]/$A->get_data()[$j][$j], $j);
-    }
-  } //End second for($i)
-  
-  //The determinant is the product of the diagonal elements
   $det *= $A->get_data()[$j][$j];
+  $A->scale_row($j, 1/$A->get_data()[$j][$j], $j); //Normalize pivot
+  
+  
+  for($i=$j+1; $i<$n; $i++) { // Elimination, for $i rows after than $j
+    if($A->get_data()[$i][$j] !=0) {
+           $A->sum_rows($i,$j, -$A->get_data()[$i][$j], $j);
+    }
+  } //End for($i)
+
 } //End for($j)
 
 
