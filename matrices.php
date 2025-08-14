@@ -6,51 +6,7 @@
 * @package LinAlg
 */
 
-/**
-* Class to catch all possible errors with matrices
-* @package LinAlg
-* @subpackage Exceptions
-*/
-class MatrixException extends Exception {
-
-public function __construct($msg, $code=0, $previous=null) {
-  parent::__construct($msg, $code, $previous);
-}
-
-}
-
-
-
-/**
-* Class to catch errors related with size of matrices
-* @package LinAlg
-* @subpackage Exceptions
-*/
-class DimensionException extends MatrixException {
-
-public function __construct($msg="Matrices or vectors are not the same size", $code=0, $previous=null) {
-  parent::__construct($msg, $code, $previous);
-}
-
-}
-
-
-
-
-
-/**
-* Class to catch errors related with construction of matrices (eg. entries are not arrays, rows are not of same size, etc.)
-* @package LinAlg
-* @subpackage Exceptions
-*/
-class BadFormationException extends MatrixException {
-
-public function __construct($msg="Error while constructing the matrix. Ensure that rows are arrays of same size, and that entries M[i][j] are of a numerical type.", $code=0, $previous=null) {
-  parent::__construct($msg, $code, $previous);
-}
-
-}
-
+include_once("exceptions.php");
 
 
 /**
@@ -64,13 +20,13 @@ class Matrix {
 /**
 * @var array<array<float|int>> $data The content of the matrix, as a 2-dim array
 */
-private $data=array(); //Matrix's data (as array)
+protected $data=array(); //Matrix's data (as array)
 
 /**
 * @var float|int $width The width (num. of columns) of the matrix.
 * @var float|int $height The height (num. of rows) of the matrix.
 */
-private $width=0, $height;
+protected $width=0, $height;
 
 
 
@@ -381,8 +337,8 @@ if($lim==0) return $A->get_data() == $B->get_data();
 else {
   $out = $A->get_dims() == $B->get_dims();
   if($out) {
-    for($i=0; $i< $A->get_h(); $i++) {
-      for($j=0; $j< $A->get_w(); $j++) $out = $out && ( abs($A->get_data()[$i][$j] - $B->get_data()[$i][$j]) <$lim );
+    foreach($A->get_data() as $i=>$Ai) {
+      foreach($Ai as $j=>$a) $out = $out && ( abs($a - $B->get_data()[$i][$j]) <$lim );
     }
   }
   return $out;
@@ -663,12 +619,13 @@ if(is_array($A)) {
   return $c;
   
 } elseif(get_class($A)=="Matrix") {
-  $c=$A->get_data();
+  $C=$A->get_data();
   
-  for($i=0; $i< $A->get_h(); $i++) {
-    for($j=0; $j< $A->get_w(); $j++) $c[$i][$j] *= $s;
+  foreach($C as $i=>$Ci) {
+    foreach($Ci as $j=>$c) $C[$i][$j] *= $s;
   }
- return new Matrix($c);
+  
+  return new Matrix($C);
  
 }
 
@@ -734,7 +691,7 @@ public static function inv_GJ(Matrix $M, $lim=0.001) {
 * @param float $lim The limit error for numerical stability. If |x|<$lim, "x" counts as zero. Util for pivoting
 * @return Matrix The solution "x" as a column matrix
 */
-public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
+public static function solve_GJ(Matrix $M,$b_arr, $lim=1e-6) {
   $b=Matrix::to_col($b_arr); //Column $b of system $A*$x = $b
   $b->gauss_jordan($M,$lim);
   return $b;
@@ -756,7 +713,7 @@ public static function solve_GJ(Matrix $M,$b_arr, $lim=0.001) {
 * @param boolean $use_cols If it's true, it avoids doing the row operations in all columns using a list of the columns which entries in the actual row are not zero. Util if almost all the row is zero to save computation time (e.g., the identity), but it's insecure and the results could be innaccurate. Set it to false if you are not secure of how many zeros have the rows
 */
 
-public function gauss_jordan(Matrix $Ap, $lim=0.001, $use_cols=false) {
+public function gauss_jordan(Matrix $Ap, $lim=1e-6, $use_cols=false) {
 
 if(!$Ap->is_squared()) throw new DimensionException("Not squared matrix given!");
 
@@ -830,7 +787,7 @@ unset($A); #Delete $A duplicate matrix
 * @param float $lim Limit to adjust error by rounding, if |$x|<$lim it counts like zero. Util for pivoting
 * @return float The determinant det($Ap) of matrix $Ap
 */
-public static function det(Matrix $Ap,$lim=0.001) {
+public static function det(Matrix $Ap,$lim=1e-6) {
 
 if(!$Ap->is_squared()) throw new DimensionException("Not square matrix given!");
 
